@@ -4,7 +4,7 @@
 
 This document explains how the frontend calls the Supabase Edge Function `generate-khqr` to generate a KHQR payment code for Bantub upgrade payment.
 
-The function generates:
+The function returns:
 
 * KHQR string
 * MD5 value for payment checking
@@ -18,52 +18,28 @@ Function name:
 generate-khqr
 ```
 
-Default payment purpose:
+Default values:
 
 ```txt
-Upgrade Plan
+Purpose: Upgrade Plan
+Currency: KHR
+Expiration: 10 minutes
 ```
 
-Default currency:
-
-```txt
-KHR
-```
-
-Default QR expiration:
-
-```txt
-10 minutes
-```
-
-> Important: The frontend countdown should match the Edge Function value `EXPIRATION_MINUTES = 10`.
+> Important: Frontend countdown should use the returned `expiresAt` value from the Edge Function.
 
 ---
 
 ## 2. Edge Function Secrets
 
-Set these secrets in Supabase Edge Function secrets.
+Set these secrets in Supabase Edge Function Secrets.
 
-### Required Secrets
-
-```env
-KHQR_BAKONG_ACCOUNT_ID=your_bakong_account_id
-KHQR_MERCHANT_NAME=your_merchant_name
-```
-
-Example:
-
-```env
-KHQR_BAKONG_ACCOUNT_ID=syden_hong@bank
-KHQR_MERCHANT_NAME=SYDEN HONG
-```
-
----
-
-### Optional Secrets
+For this project, we are using **ABA individual KHQR**, so these secrets are required.
 
 ```env
 KHQR_TYPE=individual
+KHQR_BAKONG_ACCOUNT_ID=abaakhppxxx@abaa
+KHQR_MERCHANT_NAME=SYDEN HONG
 KHQR_MERCHANT_CITY=Phnom Penh
 KHQR_ACCOUNT_INFORMATION=013834100
 KHQR_ACQUIRING_BANK=ABA Bank
@@ -71,55 +47,67 @@ KHQR_MCC=0000
 KHQR_STORE_LABEL=BANTUB
 ```
 
-Recommended value for normal individual / P2P KHQR:
+### Supabase CLI Example
 
-```env
-KHQR_TYPE=individual
+```bash
+supabase secrets set \
+  KHQR_TYPE=individual \
+  KHQR_BAKONG_ACCOUNT_ID=abaakhppxxx@abaa \
+  KHQR_MERCHANT_NAME="SYDEN HONG" \
+  KHQR_MERCHANT_CITY="Phnom Penh" \
+  KHQR_ACCOUNT_INFORMATION=013834100 \
+  KHQR_ACQUIRING_BANK="ABA Bank" \
+  KHQR_MCC=0000 \
+  KHQR_STORE_LABEL=BANTUB
 ```
 
-For ABA individual KHQR, these are important:
+After updating secrets, redeploy the function:
 
-```env
-KHQR_ACCOUNT_INFORMATION=013834100
-KHQR_ACQUIRING_BANK=ABA Bank
+```bash
+supabase functions deploy generate-khqr
 ```
 
----
+If using a demo function, deploy with the demo function name:
 
-### Merchant Mode Secrets
-
-Only required if using merchant mode:
-
-```env
-KHQR_TYPE=merchant
-KHQR_MERCHANT_ID=your_merchant_id
-KHQR_ACQUIRING_BANK=your_acquiring_bank
-```
-
-If `KHQR_TYPE=merchant`, the function requires:
-
-```env
-KHQR_MERCHANT_ID
-KHQR_ACQUIRING_BANK
+```bash
+supabase functions deploy generate-khqr-demo
 ```
 
 ---
 
-### Payment Check Function Secret
+## 3. Important Secret Notes
 
-This secret is not used by `generate-khqr`.
+The working ABA receiver uses:
 
-It is only required for the payment verification Edge Function, for example `check-khqr-payment`.
+```txt
+Bakong Account ID: abaakhppxxx@abaa
+Account Information: 013834100
+Acquiring Bank: ABA Bank
+Merchant Name: SYDEN HONG
+Merchant City: Phnom Penh
+MCC: 0000
+Store Label: BANTUB
+```
+
+Do not use this demo account for real payment testing:
+
+```env
+KHQR_BAKONG_ACCOUNT_ID=khqrdemo_ben@dev
+```
+
+For payment verification, use another Edge Function such as `check-khqr-payment`.
+
+That function needs:
 
 ```env
 BAKONG_API_TOKEN=your_bakong_api_token
 ```
 
-Do not expose this token in frontend code.
+`BAKONG_API_TOKEN` is not used by `generate-khqr`.
 
 ---
 
-## 3. Frontend Request Body
+## 4. Frontend Request Body
 
 The frontend should send this body to `generate-khqr`.
 
@@ -134,23 +122,21 @@ The frontend should send this body to `generate-khqr`.
 }
 ```
 
-### Request Body Fields
+### Request Fields
 
-| Field                  |   Type | Required | Description                                                                  |
-| ---------------------- | -----: | -------: | ---------------------------------------------------------------------------- |
-| `amount`               | number |      Yes | Payment amount. Must be greater than `0`.                                    |
-| `currency`             | string |       No | Supports `KHR` or `USD`. Default is `KHR`.                                   |
-| `billNumber`           | string |       No | Unique bill number. Max 25 characters.                                       |
-| `storeLabel`           | string |       No | Store label. Default from `KHQR_STORE_LABEL` or `BANTUB`. Max 25 characters. |
-| `terminalLabel`        | string |       No | Terminal label. Default is `WEB`. Max 25 characters.                         |
-| `purposeOfTransaction` | string |       No | Payment purpose. Default is `Upgrade Plan`. Max 25 characters.               |
-| `phoneNumber`          | string |       No | Optional customer phone number. Max 25 characters.                           |
+| Field                  |   Type | Required | Description                                                    |
+| ---------------------- | -----: | -------: | -------------------------------------------------------------- |
+| `amount`               | number |      Yes | Payment amount. Must be greater than `0`.                      |
+| `currency`             | string |       No | Supports `KHR` or `USD`. Default is `KHR`.                     |
+| `billNumber`           | string |       No | Unique bill number. Max 25 characters.                         |
+| `storeLabel`           | string |       No | Store label. Default is `BANTUB`. Max 25 characters.           |
+| `terminalLabel`        | string |       No | Terminal label. Default is `WEB`. Max 25 characters.           |
+| `purposeOfTransaction` | string |       No | Payment purpose. Default is `Upgrade Plan`. Max 25 characters. |
+| `phoneNumber`          | string |       No | Optional phone number. Max 25 characters.                      |
 
 ---
 
-## 4. Call From Frontend Using Supabase Client
-
-Recommended frontend call:
+## 5. Frontend Example With Supabase Client
 
 ```ts
 const payload = {
@@ -168,7 +154,7 @@ const { data, error } = await supabase.functions.invoke("generate-khqr", {
 
 if (error) {
   console.error("Generate KHQR error:", error);
-  alert("Failed to generate KHQR. Please try again.");
+  alert("Failed to generate KHQR.");
   return;
 }
 
@@ -178,16 +164,14 @@ if (!data?.success) {
   return;
 }
 
-console.log("KHQR:", data.qr);
+console.log("QR:", data.qr);
 console.log("MD5:", data.md5);
 console.log("Expires At:", data.expiresAt);
 ```
 
 ---
 
-## 5. Call From Frontend Using Fetch
-
-Alternative direct `fetch` example:
+## 6. Frontend Example With Fetch
 
 ```ts
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -225,7 +209,7 @@ console.log(data);
 
 ---
 
-## 6. Success Response Example
+## 7. Success Response Example
 
 ```json
 {
@@ -238,7 +222,7 @@ console.log(data);
   "expiresAt": 1793160000000,
   "khqrType": "individual",
   "receiver": {
-    "bakongAccountId": "your_bakong_account_id",
+    "bakongAccountId": "abaakhppxxx@abaa",
     "accountInformation": "013834100",
     "acquiringBank": "ABA Bank",
     "merchantName": "SYDEN HONG",
@@ -250,7 +234,7 @@ console.log(data);
 
 ---
 
-## 7. Error Response Example
+## 8. Error Response Example
 
 ```json
 {
@@ -270,44 +254,27 @@ Another possible error:
 
 ---
 
-## 8. Frontend Payment Flow
-
-Recommended flow:
+## 9. Frontend Payment Flow
 
 1. User chooses upgrade package.
 2. Frontend calculates total price.
-3. Frontend sends request to `generate-khqr`.
+3. Frontend calls `generate-khqr`.
 4. Edge Function returns `qr`, `md5`, and `expiresAt`.
 5. Frontend shows QR popup.
 6. Frontend starts countdown using `expiresAt`.
-7. Frontend uses `md5` to call payment-check function.
+7. Frontend calls payment-check function using `md5`.
 8. If payment is completed, update upgrade request status.
 9. If expired, close popup or show retry button.
 
 ---
 
-## 9. Example Upgrade Payment Payload
-
-Use this format for Bantub upgrade plan payment:
+## 10. Demo Payload Example
 
 ```ts
 const generateKhqrPayload = {
   amount: totalPrice,
   currency: "KHR",
-  billNumber: upgradeRequestCode,
-  storeLabel: "BANTUB",
-  terminalLabel: "WEB",
-  purposeOfTransaction: "Upgrade Plan",
-};
-```
-
-Example:
-
-```ts
-const generateKhqrPayload = {
-  amount: 2500,
-  currency: "KHR",
-  billNumber: "E0B8C423",
+  billNumber: `DEMO-${Date.now()}`,
   storeLabel: "BANTUB",
   terminalLabel: "WEB",
   purposeOfTransaction: "Upgrade Plan",
@@ -316,20 +283,20 @@ const generateKhqrPayload = {
 
 ---
 
-## 10. Important Notes For Developers
+## 11. Developer Notes
 
 ### Amount Rules
 
 For `KHR`:
 
 ```ts
-amount = Math.round(amount)
+amount = Math.round(amount);
 ```
 
 For `USD`:
 
 ```ts
-amount = Number(amount.toFixed(2))
+amount = Number(amount.toFixed(2));
 ```
 
 ### Currency Rules
@@ -360,89 +327,29 @@ terminalLabel
 purposeOfTransaction
 ```
 
-### CORS
-
-The Edge Function allows:
-
-```txt
-POST
-OPTIONS
-```
-
-Allowed headers:
-
-```txt
-authorization
-x-client-info
-apikey
-content-type
-```
-
----
-
-## 11. Local Testing Payload
-
-Use this JSON body for testing:
-
-```json
-{
-  "amount": 2500,
-  "currency": "KHR",
-  "billNumber": "E0B8C423",
-  "storeLabel": "BANTUB",
-  "terminalLabel": "WEB",
-  "purposeOfTransaction": "Upgrade Plan"
-}
-```
-
 ---
 
 ## 12. Common Problems
 
-### Problem: Missing environment variable
+### QR generated but payment checking fails
 
-Example:
+`generate-khqr` does not use `BAKONG_API_TOKEN`.
 
-```json
-{
-  "success": false,
-  "message": "Missing environment variable: KHQR_BAKONG_ACCOUNT_ID"
-}
-```
-
-Fix:
-
-Check Edge Function Secrets and make sure the required secret exists.
-
----
-
-### Problem: QR generated but payment checking fails
-
-Possible reason:
-
-`generate-khqr` works without `BAKONG_API_TOKEN`, but payment checking needs a valid Bakong API token.
-
-Fix:
-
-Check the payment verification Edge Function secret:
+Payment checking needs a valid token in the payment-check Edge Function:
 
 ```env
 BAKONG_API_TOKEN=your_bakong_api_token
 ```
 
----
+### Frontend countdown expires too early
 
-### Problem: Frontend countdown expires too early
+Do not hardcode 2 minutes.
 
-Current Edge Function expiration is:
+Use the returned value:
 
 ```ts
-const EXPIRATION_MINUTES = 10;
+data.expiresAt
 ```
-
-Fix:
-
-Make the frontend countdown use the returned `expiresAt` value instead of hardcoding 2 minutes.
 
 ---
 
@@ -465,4 +372,4 @@ VITE_SUPABASE_URL
 VITE_SUPABASE_ANON_KEY
 ```
 
-Private payment logic must stay inside Edge Functions.
+Private payment logic must stay inside Supabase Edge Functions.
