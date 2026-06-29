@@ -32,11 +32,7 @@ Expiration: 10 minutes
 
 A demo page is available for team testing.
 
-Demo URL:
-
-```txt
-[HERE_IS_DEMO_SITE_URL](https://khqr-demo.pages.dev/)
-```
+Demo URL: [KHQR Demo Site](https://khqr-demo.pages.dev/)
 
 This demo page allows the team to:
 
