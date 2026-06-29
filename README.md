@@ -28,6 +28,28 @@ Expiration: 10 minutes
 
 > Important: Frontend countdown should use the returned `expiresAt` value from the Edge Function.
 
+## Demo Site
+
+A demo page is available for team testing.
+
+Demo URL:
+
+```txt
+[HERE_IS_DEMO_SITE_URL](https://khqr-demo.pages.dev/)
+```
+
+This demo page allows the team to:
+
+* Choose currency: `KHR` or `USD`
+* Enter payment amount
+* Generate KHQR
+* View QR code
+* View MD5 value
+* View expiration time
+* Test the frontend request body sent to the Edge Function
+
+> Note: This demo only generates KHQR. Payment checking requires the separate `check-khqr-payment` Edge Function and `BAKONG_API_TOKEN`.
+
 ---
 
 ## 2. Edge Function Secrets
